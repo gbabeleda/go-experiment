@@ -1,0 +1,44 @@
+services:
+  go-api:
+    build:
+      context: .
+      target: api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - go-postgres
+      - go-redis
+
+  go-worker:
+    build:
+      context: .
+      target: worker
+    env_file:
+      - .env
+    depends_on:
+      - go-postgres
+      - go-redis
+
+  go-postgres:
+    image: postgres:17-bookworm
+    ports:
+      - "5445:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: defaultdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  go-redis:
+    image: redis:7-bookworm
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
