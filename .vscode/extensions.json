@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "golang.go",         // Go language support — gopls, gofmt, debugger
+    "redhat.vscode-yaml", // docker-compose YAML
+    "docker.docker"      // Dockerfile support + compose
+  ]
+}
