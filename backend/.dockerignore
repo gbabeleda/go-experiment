@@ -31,20 +31,21 @@ go.work.sum
 .idea/
 .vscode/
 
-# Git
-.git/
-.github/
-.gitignore
-.gitattributes
+# Does not apply under backend/ because context is set to backend/ in docker-compose.override.yml
+# # Git
+# .git/
+# .github/
+# .gitignore
+# .gitattributes
 
-# Docker
-docker-compose.yml
-docker-compose*.yml
-.dockerignore
+# # Docker
+# docker-compose.yml
+# docker-compose*.yml
+# .dockerignore
 
-# Docs
-*.md
-LICENSE
+# # Docs
+# *.md
+# LICENSE
 
 # OS
 **/.DS_Store

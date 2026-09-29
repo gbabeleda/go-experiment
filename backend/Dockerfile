@@ -12,6 +12,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the rest of the source code
+# This is fine because context is set to backend/
 COPY . .
 
 # Build both the API and worker binaries to /bin output path
@@ -21,7 +22,7 @@ RUN CGO_ENABLED=0 go build -o /bin/api ./cmd/api && \
 
 
 # Stage 2: slim api image
-FROM alpine AS api
+FROM alpine:3.24.1 AS api
 
 # Create a non-root user and group with some difference from Debian
 # Create user before chown to avoid issues with permissions when copying files from the builder stage
@@ -40,7 +41,7 @@ EXPOSE 8080
 ENTRYPOINT ["/bin/api"]
 
 # Stage 3: slim worker image
-FROM alpine AS worker
+FROM alpine:3.24.1 AS worker
 
 RUN addgroup -S -g 1000 appuser && \
     adduser -S -G appuser -u 1000 appuser
