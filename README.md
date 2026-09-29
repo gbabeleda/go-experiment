@@ -24,26 +24,45 @@ library genuinely cannot do the job.
 ## Structure
 
 ```
-cmd/
-  api/
-    main.go         ← package main: wires dependencies, starts the HTTP server
-internal/
-  config/
-    config.go       ← env vars loaded into a typed struct at startup
-    config_test.go  ← tests live next to the code, not in a separate directory
-  db/
-    db.go           ← pgx pool setup, returned to cmd/api for injection
-  handlers/
-    handler.go      ← Handler struct holding deps; route methods hang off it
-  services/         ← application logic; called by handlers, calls db queries
-  models/           ← plain Go structs representing domain concepts
-Dockerfile          ← multi-stage build; one file, one target per binary
-docker-compose.yml  ← local Postgres + any other backing services
+backend/              ← the Go module — everything Go lives here
+  go.mod, go.sum
+  cmd/
+    api/
+      main.go         ← package main: wires dependencies, starts the HTTP server
+    worker/
+      main.go         ← package main: the background worker
+  internal/
+    config/
+      config.go       ← env vars loaded into a typed struct at startup
+      config_test.go  ← tests live next to the code, not in a separate directory
+    db/
+      db.go           ← pgx pool setup, returned to cmd/api for injection
+    handlers/
+      handler.go      ← Handler struct holding deps; route methods hang off it
+    services/         ← application logic; called by handlers, calls db queries
+    models/           ← plain Go structs representing domain concepts
+  playground/         ← scratch code for trying things out, not part of the service
+  Dockerfile          ← multi-stage build; one file, one target per binary
+  .dockerignore       ← must sit here: Docker reads it from the build context root
+docs/                 ← design notes behind the decisions in this repo
+docker-compose.yml           ← production shape — prebuilt images, no backing services
+docker-compose.override.yml  ← local dev — adds build: + Postgres/Redis, merged in automatically
 ```
 
-`cmd/` contains `package main` entrypoints — one per runnable process. If a worker is added
-later, it gets its own `cmd/worker/main.go`. Each binary only pulls in what it actually imports,
-so the API image never carries worker code even though both share `internal/`.
+**Why `backend/`.** The repo root holds what spans the whole project (compose, docs); each
+application gets its own top-level folder, leaving room for a `frontend/` beside it. `backend/`
+is a complete Go module on its own — the directory holding `go.mod` is the module root, so
+nothing inside it knows or cares that it moved.
+
+That also makes `backend/` the Docker build context (`context: ./backend` in the override).
+Go needs nothing outside its own module to build, so the context can be exactly that folder — a
+contrast with Python uv and JS pnpm workspaces, whose images need the repo root for the shared
+lockfile. One consequence: Docker reads `.dockerignore` from the context root, so it lives in
+`backend/`, not at the repo root, where it would silently stop applying.
+
+`cmd/` contains `package main` entrypoints — one per runnable process: `cmd/api` and
+`cmd/worker`. Each binary only pulls in what it actually imports, so the API image never carries
+worker code even though both share `internal/`.
 
 `internal/` is shared code that is compiler-enforced private to this module: nothing outside
 `github.com/gbabeleda/go-experiment` can import it. Within the module, `cmd/api` imports
@@ -143,7 +162,13 @@ anything concurrent.
 
 ## Common Commands
 
+Go commands run from `backend/` — `cd backend` first, or stay at the root and pass `-C`
+(`go -C backend run ./cmd/api`), which changes directory for that one command. Docker commands
+run from the repo root, where the compose files are.
+
 ```bash
+# --- From backend/ ---
+
 # Run without building (development)
 go run ./cmd/api
 go run ./cmd/worker
@@ -167,6 +192,8 @@ go get github.com/some/package
 # Remove unused deps, add missing ones — run after adding/removing imports
 go mod tidy
 
+# --- From the repo root ---
+
 # Docker
 docker compose build          # build all service images
 docker compose up             # start all services
@@ -179,8 +206,8 @@ docker compose logs           #
 
 ## Reference
 
-- [go-zero-to-hero.md](../engineering-notes/backend/go-zero-to-hero.md) — translation guide from FastAPI + Celery to Go
-- [hexagonal-architecture-reference.md](../engineering-notes/backend/hexagonal-architecture-reference.md) — the architectural pattern the structure follows
+- [go-zero-to-hero.md](../engineering-notes/reference/backend/go-zero-to-hero.md) — translation guide from FastAPI + Celery to Go
+- [hexagonal-architecture-reference.md](../engineering-notes/reference/named-principles/hexagonal-architecture-reference.md) — the architectural pattern the structure follows
 - [Tour of Go](https://go.dev/tour) — do the whole thing before writing much code here
 - [Effective Go](https://go.dev/doc/effective_go) — idioms and why they exist
 - [Go module layout](https://go.dev/doc/modules/layout) — official reference for `cmd/` + `internal/` layout

@@ -1,0 +1,78 @@
+services:
+  go-api:
+    build:
+      context: ./backend
+      target: api
+    depends_on:
+      go-postgres:
+        condition: service_healthy
+      go-redis:
+        condition: service_healthy
+
+  go-worker:
+    build:
+      context: ./backend
+      target: worker
+    depends_on:
+      go-postgres:
+        condition: service_healthy
+      go-redis:
+        condition: service_healthy
+
+  go-postgres:
+    container_name: go-postgres
+    image: postgres:17-bookworm
+    ports:
+      - 5445:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: defaultdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    stop_grace_period: 60s
+    healthcheck:
+      test: >
+        pg_isready -U postgres -d defaultdb
+      interval: 600s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 5s
+    # cpus: "1.0"
+    # mem_limit: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+
+  go-redis:
+    container_name: go-redis
+    image: redis:7-bookworm
+    ports:
+      - 6381:6379
+    volumes:
+      - redis_data:/data
+    restart: always
+    stop_grace_period: 60s
+    healthcheck:
+      test: >
+        redis-cli ping
+      interval: 600s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 5s
+    # cpus: "0.5"
+    # mem_limit: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+
+volumes:
+  postgres_data:
+  redis_data:
