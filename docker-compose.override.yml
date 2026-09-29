@@ -1,4 +1,10 @@
 services:
+  go-frontend:
+    build:
+      context: .
+      target: nxt-app
+      dockerfile: ./frontend/Dockerfile
+
   go-api:
     build:
       context: ./backend

@@ -1,0 +1,22 @@
+# Paired with ./Dockerfile by name: BuildKit uses <Dockerfile>.dockerignore in place of
+# the context root's .dockerignore. The context is the repo root (the pnpm workspace
+# lives there), so these patterns match from the repo root, not from frontend/.
+
+# Allowlist: exclude everything, then re-include only what the Dockerfile reads.
+# backend/, .git, the root .env and any future root files stay out automatically.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!frontend/
+
+# Then trim inside frontend/. Later rules win, so these apply after the re-include.
+# **/ because patterns anchor to the context root; bare `node_modules/` would only
+# match a top-level one.
+**/node_modules/
+**/.next/
+**/out/
+**/next-env.d.ts
+**/*.tsbuildinfo
+**/.env*
+**/.DS_Store

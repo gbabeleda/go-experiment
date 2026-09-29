@@ -1,4 +1,24 @@
 services:
+  go-frontend:
+    container_name: go-frontend
+    image: ${REGISTRY_IMAGE_FRONTEND}
+    ports:
+      - 3002:3002
+    env_file:
+      - .env
+    depends_on:
+      go-api:
+        condition: service_started
+    restart: always
+    stop_grace_period: 60s
+    # cpus: "0.5"
+    # mem_limit: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+
   go-api:
     container_name: go-api
     image: ${REGISTRY_IMAGE_API}
