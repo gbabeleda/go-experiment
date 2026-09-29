@@ -2,6 +2,10 @@
   "name": "nxt-app",
   "version": "0.1.0",
   "private": true,
+  "files": [
+    ".next",
+    "public"
+  ],
   "scripts": {
     "dev": "next dev --port 3002",
     "build": "next build",
