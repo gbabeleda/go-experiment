@@ -1,23 +1,30 @@
 # go-experiment
 
-Learning Go by building a production-grade backend — not by following tutorials.
+A production-grade full-stack project, built to learn — not by following tutorials.
 
-The premise: coming from a production Python stack (FastAPI, Celery, SQLAlchemy, Pydantic, uv
-monorepo). Every Go concept here is anchored against its Python equivalent. The goal is not to
-learn Go in isolation but to understand what maps to what, what the language does differently,
-and why.
+Three focuses, in order of weight:
+
+- **Go** — the main line. A backend written by hand, anchored against a production Python stack
+  (FastAPI, Celery, SQLAlchemy, Pydantic, uv monorepo): what maps to what, what Go does
+  differently, and why.
+- **Next.js** — a secondary line. A frontend beside the backend, mirroring a production Next.js +
+  pnpm setup elsewhere, so the two can be compared and the open questions from there tested here.
+- **Everything around the code** — containers, compose, CI, tooling. The undercurrent that makes
+  it production-grade rather than a toy: each of these is built the way a real service would
+  need it, not skipped because the app is small.
 
 ---
 
 ## What This Is
 
-A small HTTP service backed by Postgres, built with the same architectural patterns used in
-production Python: hexagonal architecture, layered domain/application/delivery separation, config
-from environment, tests alongside code.
+A small HTTP service backed by Postgres and Redis, with a Next.js frontend, built with the same
+architectural patterns used in production: hexagonal architecture, layered
+domain/application/delivery separation, config from environment, tests alongside code, one
+container image per concern.
 
-The point is not the service itself — it is the muscle memory of writing Go idiomatically. So the
-code is written by hand, not generated. External libraries are introduced only when the standard
-library genuinely cannot do the job.
+The point is not the service itself — it is the muscle memory of doing each layer properly. So
+the code is written by hand, not generated. External libraries are introduced only when the
+standard library (or the framework) genuinely cannot do the job.
 
 ---
 
@@ -43,22 +50,35 @@ backend/              ← the Go module — everything Go lives here
     models/           ← plain Go structs representing domain concepts
   playground/         ← scratch code for trying things out, not part of the service
   Dockerfile          ← multi-stage build; one file, one target per binary
-  .dockerignore       ← must sit here: Docker reads it from the build context root
+  Dockerfile.dockerignore
+frontend/             ← the JS apps, one folder per app
+  nxt-app/            ← Next.js (App Router, TypeScript, Tailwind, src/ layout), port 3002
+  Dockerfile          ← pnpm multi-stage build; one runtime target per app
+  Dockerfile.dockerignore
+package.json          ← pnpm workspace root: pins pnpm and Node via devEngines
+pnpm-workspace.yaml   ← declares frontend/* as workspace packages
+pnpm-lock.yaml        ← one lockfile for every JS app
 docs/                 ← design notes behind the decisions in this repo
 docker-compose.yml           ← production shape — prebuilt images, no backing services
 docker-compose.override.yml  ← local dev — adds build: + Postgres/Redis, merged in automatically
 ```
 
-**Why `backend/`.** The repo root holds what spans the whole project (compose, docs); each
-application gets its own top-level folder, leaving room for a `frontend/` beside it. `backend/`
-is a complete Go module on its own — the directory holding `go.mod` is the module root, so
-nothing inside it knows or cares that it moved.
+**Why `backend/` and `frontend/`.** The repo root holds what spans the whole project (compose,
+docs, the pnpm workspace files); each side of the stack gets its own top-level folder.
+`backend/` is a complete Go module on its own — the directory holding `go.mod` is the module
+root, so nothing inside it knows or cares where it sits.
 
-That also makes `backend/` the Docker build context (`context: ./backend` in the override).
-Go needs nothing outside its own module to build, so the context can be exactly that folder — a
-contrast with Python uv and JS pnpm workspaces, whose images need the repo root for the shared
-lockfile. One consequence: Docker reads `.dockerignore` from the context root, so it lives in
-`backend/`, not at the repo root, where it would silently stop applying.
+The two sides build differently, and it shows in their Docker build contexts. Go needs nothing
+outside its own module, so the backend's context is exactly `./backend`. The pnpm workspace's
+lockfile lives at the repo root, so the frontend's context has to be the root — the same as a
+Python uv workspace would need.
+
+**Ignore files are named after their Dockerfile.** Docker reads a plain `.dockerignore` only from
+the context root, which would put the frontend's at the repo root, applying to every build.
+BuildKit also accepts `<Dockerfile>.dockerignore` beside the Dockerfile, used in place of the
+root one — so each Dockerfile carries its own, and both sides follow one rule. The patterns
+still match from the context root. The frontend's is an allowlist: everything is excluded except
+the four paths its build reads, so `backend/`, `.git` and the root `.env` can't leak in.
 
 `cmd/` contains `package main` entrypoints — one per runnable process: `cmd/api` and
 `cmd/worker`. Each binary only pulls in what it actually imports, so the API image never carries
@@ -163,8 +183,8 @@ anything concurrent.
 ## Common Commands
 
 Go commands run from `backend/` — `cd backend` first, or stay at the root and pass `-C`
-(`go -C backend run ./cmd/api`), which changes directory for that one command. Docker commands
-run from the repo root, where the compose files are.
+(`go -C backend run ./cmd/api`), which changes directory for that one command. pnpm and Docker
+commands run from the repo root, where the workspace and compose files are.
 
 ```bash
 # --- From backend/ ---
@@ -193,6 +213,12 @@ go get github.com/some/package
 go mod tidy
 
 # --- From the repo root ---
+
+# Frontend
+pnpm install                          # install every JS app from the root lockfile
+pnpm --filter=nxt-app run dev         # dev server on :3002
+pnpm --filter=nxt-app run build
+pnpm --filter=nxt-app add <package>   # add a dependency — use the CLI, don't hand-edit package.json
 
 # Docker
 docker compose build          # build all service images
